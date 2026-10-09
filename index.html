@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تحلیل هوشمند کامنت</title>
+    <!-- اضافه کردن فونت وزیرمتن -->
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.0.0/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+    <!-- اضافه کردن Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Vazirmatn', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; }
+        .loader { border-top-color: #3b82f6; -webkit-animation: spinner 1.5s linear infinite; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+
+    <div class="max-w-2xl w-full bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div class="bg-blue-600 p-6 text-center text-white">
+            <h1 class="text-2xl font-bold">سیستم هوشمند تحلیل احساسات</h1>
+            <p class="text-blue-100 mt-2 text-sm">بررسی خودکار کامنت‌های مشتریان با هوش مصنوعی</p>
+        </div>
+
+        <div class="p-6">
+            <label for="comment" class="block text-gray-700 font-semibold mb-2">کامنت خود را بنویسید:</label>
+            <textarea id="comment" rows="4" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow resize-none" placeholder="مثلاً: کیفیت کالا عالی بود اما بسته‌بندی پاره شده بود..."></textarea>
+            
+            <button onclick="analyzeComment()" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-colors flex justify-center items-center gap-2">
+                <span id="btn-text">تحلیل کامنت</span>
+                <div id="loading" class="loader hidden ease-linear rounded-full border-2 border-t-2 border-gray-200 h-5 w-5"></div>
+            </button>
+
+            <!-- بخش نمایش نتایج -->
+            <div id="result-box" class="mt-8 hidden">
+                <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">نتیجه تحلیل هوش مصنوعی:</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
+                        <span class="block text-gray-500 text-sm mb-1">حس کلی متن</span>
+                        <span id="res-sentiment" class="text-lg font-bold text-gray-800">...</span>
+                        <span id="res-sentiment-score" class="text-xs text-gray-400 block mt-1"></span>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
+                        <span class="block text-gray-500 text-sm mb-1">موضوع پیام</span>
+                        <span id="res-category" class="text-lg font-bold text-gray-800">...</span>
+                        <span id="res-category-score" class="text-xs text-gray-400 block mt-1"></span>
+                    </div>
+                </div>
+            </div>
+            <!-- پیغام خطا -->
+            <div id="error-box" class="mt-4 hidden p-4 bg-red-50 text-red-600 rounded-xl text-sm font-semibold"></div>
+        </div>
+    </div>
+
+    <script>
+        async function analyzeComment() {
+            const commentText = document.getElementById('comment').value.trim();
+            const btnText = document.getElementById('btn-text');
+            const loading = document.getElementById('loading');
+            const resultBox = document.getElementById('result-box');
+            const errorBox = document.getElementById('error-box');
+
+            if (!commentText) {
+                alert("لطفاً ابتدا یک کامنت بنویسید!");
+                return;
+            }
+
+            // تغییر حالت دکمه به در حال پردازش
+            btnText.innerText = "در حال پردازش...";
+            loading.classList.remove('hidden');
+            resultBox.classList.add('hidden');
+            errorBox.classList.add('hidden');
+
+            try {
+                // ارسال درخواست به سرور FastAPI
+                const response = await fetch('http://127.0.0.1:8000/analyze/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: commentText })
+                });
+
+                if (!response.ok) {
+                    throw new Error("خطا در ارتباط با سرور");
+                }
+
+                const data = await response.json();
+
+                // پر کردن نتایج در رابط کاربری
+                const sentimentEl = document.getElementById('res-sentiment');
+                sentimentEl.innerText = data.sentiment;
+                
+                // تغییر رنگ بر اساس مثبت یا منفی بودن
+                sentimentEl.className = `text-lg font-bold ${data.sentiment === 'مثبت' ? 'text-green-600' : (data.sentiment === 'منفی' ? 'text-red-600' : 'text-gray-600')}`;
+                
+                document.getElementById('res-sentiment-score').innerText = `اطمینان: %${data.sentiment_score}`;
+                document.getElementById('res-category').innerText = data.category;
+                document.getElementById('res-category-score').innerText = `اطمینان: %${data.category_score}`;
+
+                // نمایش باکس نتیجه
+                resultBox.classList.remove('hidden');
+
+            } catch (error) {
+                errorBox.innerText = "متاسفانه خطایی رخ داد. مطمئن شوید سرور بک‌اند در حال اجراست.";
+                errorBox.classList.remove('hidden');
+            } finally {
+                // بازگرداندن دکمه به حالت اولیه
+                btnText.innerText = "تحلیل کامنت";
+                loading.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
